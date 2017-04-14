@@ -50,11 +50,10 @@ y_ = tf.placeholder(dtype=tf.float32, shape=[None, 2])
 # dropout参数
 keep_prob = tf.placeholder(dtype=tf.float32)
 # reshaped并加上高斯噪音
-noise = tf.random_normal(shape=tf.shape(x_), mean=0.0, stddev=0.5, dtype=tf.float32)
-x = tf.reshape(x_ + noise, [-1, 512, 512, 1])
+# noise = tf.random_normal(shape=tf.shape(x_), mean=0.0, stddev=0.5, dtype=tf.float32)
+x = tf.reshape(x_, [-1, 512, 512, 1])
 
 # Layer 1
-# 共享权重，尺寸：[1, 1, 1, 128]，1*1的卷积核尺寸、1个通道(黑白图像)、512个卷积核数量，即特征数量
 W_conv1 = weight_variable([1, 1, 1, 64])
 b_conv1 = bias_variable([64])
 h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
@@ -67,26 +66,26 @@ h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
 h_pool2 = max_pool_2x2(h_conv2)  # [None, 128, 128, 8]
 
 # Layer 3
-W_conv3 = weight_variable([1, 1, 64, 32])
-b_conv3 = bias_variable([32])
+W_conv3 = weight_variable([3, 3, 64, 128])
+b_conv3 = bias_variable([128])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
 h_pool3 = max_pool_2x2(h_conv3)  # [None, 64, 64, 4]
 
 # Layer 4
-W_conv4 = weight_variable([1, 1, 32, 32])
-b_conv4 = bias_variable([32])
+W_conv4 = weight_variable([3, 3, 128, 128])
+b_conv4 = bias_variable([128])
 h_conv4 = tf.nn.relu(conv2d(h_pool3, W_conv4) + b_conv4)
 h_pool4 = max_pool_2x2(h_conv4)  # [None, 32, 32, 1]
 
 # Layer 5
-W_conv5 = weight_variable([1, 1, 32, 16])
-b_conv5 = bias_variable([16])
+W_conv5 = weight_variable([5, 5, 128, 256])
+b_conv5 = bias_variable([256])
 h_conv5 = tf.nn.relu(conv2d(h_pool4, W_conv5) + b_conv5)
 h_pool5 = max_pool_2x2(h_conv5)  # [None, 16, 16, 1]
 
 # Layer 6
-W_conv6 = weight_variable([1, 1, 16, 16])
-b_conv6 = bias_variable([1])
+W_conv6 = weight_variable([7, 7, 256, 256])
+b_conv6 = bias_variable([256])
 h_conv6 = tf.nn.relu(conv2d(h_pool5, W_conv6) + b_conv6)
 h_pool6 = max_pool_2x2(h_conv6)  # [None, 8, 8, 1]
 
@@ -100,11 +99,11 @@ print_activations(h_pool6)
 
 # 构建全连接层，设定为128个神经元
 # 权重
-W_fc1 = weight_variable([8*8*16, 512])
+W_fc1 = weight_variable([8*8*256, 512])
 # 偏置
 b_fc1 = bias_variable([512])
 # 将卷积层的池化输出转换为一维
-h_pool6_flat = tf.reshape(h_pool6, [-1, 8*8*16])
+h_pool6_flat = tf.reshape(h_pool6, [-1, 8*8*256])
 # 激活函数
 h_fc1 = tf.nn.relu(tf.matmul(h_pool6_flat, W_fc1) + b_fc1)
 # Dropout层，避免过拟合(输出尺寸:[None, 128])
@@ -126,6 +125,61 @@ optimizer = tf.train.AdamOptimizer(1e-4).minimize(loss)
 train_file_path = "traindata\\"
 train_file_list = glob(train_file_path+"images_????_????.npy")
 
+
+def randommask(img, size, num, centerX, centerY, radius):
+    imgHeight = img.shape[0]
+    imgWidth = img.shape[0]
+    mask = np.ones([imgHeight, imgWidth])
+    for i in range(num):
+        minX, minY, maxX, maxY = makemask(size, centerX, centerY, imgWidth, imgHeight, radius)
+        for x_i in range(minX, maxX):
+            for y_i in range(minY, maxY):
+                mask[y_i, x_i] = 0
+    return img * mask
+
+def makemask(size, centerX, centerY, imgWidth, imgHeight ,radius):
+    startX = 0
+    startY = 0
+    maxX = imgWidth - size
+    maxY = imgHeight - size
+    startX = np.random.randint(low=0, high=maxX)
+    startY = np.random.randint(low=0, high=maxY)
+    node_min_x = int(centerX - radius)
+    node_min_y = int(centerY - radius)
+    node_max_x = int(centerX + radius)
+    node_max_y = int(centerY + radius)
+
+    # 判断节点是否在mask内部
+    if node_min_x > startX and node_min_y > startY and node_max_x < (startX + size) and node_max_y < (startY + size):
+        # 如果在的话递归调用再随机产生一个
+        return makemask(size, centerX, centerY, imgWidth, imgHeight, radius)
+    else:
+        # 不在的话返回mask左上角和右下角坐标
+        return startX, startY, startX+size, startY+size
+
+
+def randomnodemask(img, size, num, centerX, centerY, radius):
+    imgHeight = img.shape[0]
+    imgWidth = img.shape[0]
+    mask = np.ones([imgHeight, imgWidth])
+    for i in range(num):
+        minX, minY, maxX, maxY = makenodemask(size, centerX, centerY, imgWidth, imgHeight, radius)
+        for x_i in range(minX, maxX):
+            for y_i in range(minY, maxY):
+                mask[y_i, x_i] = 0
+    return img * mask
+
+
+def makenodemask(size, centerX, centerY, imgWidth, imgHeight ,radius):
+    startX = centerX - size - radius
+    startY = centerY - size - radius
+    maxX = centerX + size + radius
+    maxY = centerY + size + radius
+    startX = np.random.randint(low=startX, high=maxX)
+    startY = np.random.randint(low=startY, high=maxY)
+
+    return startX, startY, startX+size, startY+size
+
 with tf.Session() as sess:
     init = tf.global_variables_initializer()
     sess.run(init)
@@ -134,7 +188,7 @@ with tf.Session() as sess:
     iend = 0
     isize = 5
 
-    for runs in range(50):
+    for runs in range(10):
         train_x = np.array(np.zeros(shape=[isize*3, 512, 512], dtype=np.float32))
         train_y = np.array(np.zeros(shape=[isize*3, 2], dtype=np.float32))
 
@@ -151,11 +205,15 @@ with tf.Session() as sess:
                 imgs = np.load(imgfilename)
                 v_center = np.load(v_centerfilename)
 
-                train_x[iIndex] = imgs[0]
-                train_x[iIndex+1] = imgs[1]
-                train_x[iIndex+2] = imgs[2]
                 train_y[iIndex][0] = train_y[iIndex + 1][0] = train_y[iIndex + 2][0] = v_center[0]
                 train_y[iIndex][1] = train_y[iIndex + 1][1] = train_y[iIndex + 2][1] = v_center[1]
+
+                train_x[iIndex] = randommask(imgs[0], 64, 5, train_y[iIndex][0], train_y[iIndex][1], 10)
+                train_x[iIndex] = randomnodemask(train_x[iIndex], 5, 5, train_y[iIndex][0], train_y[iIndex][1], 10)
+                train_x[iIndex+1] = randommask(imgs[1], 64, 5, train_y[iIndex][0], train_y[iIndex][1], 10)
+                train_x[iIndex+1] = randomnodemask(train_x[iIndex+1], 5, 5, train_y[iIndex][0], train_y[iIndex][1], 10)
+                train_x[iIndex+2] = randommask(imgs[2], 64, 5, train_y[iIndex][0], train_y[iIndex][1], 10)
+                train_x[iIndex+2] = randomnodemask(train_x[iIndex+2], 5, 5, train_y[iIndex][0], train_y[iIndex][1], 10)
 
                 iIndex += 1
 

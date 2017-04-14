@@ -4,15 +4,15 @@ import pickle
 from glob import glob
 
 train_file_path = "traindata\\"
-train_file_list = glob(train_file_path+"images_????_????.npy")
+train_file_list = glob(train_file_path+"images_0004_0086.npy")
 
 print(train_file_list.__len__())
 
-test_imgfilename = train_file_list[1063]
+test_imgfilename = train_file_list[0]
 test_v_centerfilename = test_imgfilename.replace("images", "v_center")
 test_img = np.load(test_imgfilename)[0]
 test_v_center = np.load(test_v_centerfilename)
-
+print(test_v_center)
 plt.imshow(test_img)
 plt.plot(int(test_v_center[0]), int(test_v_center[1]), 'ro', color='red')
 plt.show()
