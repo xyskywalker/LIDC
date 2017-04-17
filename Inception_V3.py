@@ -664,22 +664,23 @@ def cutimg(img, centerX, centerY):
     maxY = startY + 299
 
     # 中心点太靠上
-    if centerX - startX < 20:
-        startX -= 20
-        maxX -= 20
-    # 中心点太靠左
     if centerY - startY < 20:
         startY -= 20
         maxY -= 20
+    # 中心点太靠左
+    if centerX - startX < 20:
+        startX -= 20
+        maxX -= 20
     # 中心点太靠下
-    if maxX - centerX < 20:
-        startX += 20
-        maxX += 20
-    # 中心点太靠右
     if maxY - centerY < 20:
         startY += 20
         maxY += 20
-    return img[startX:maxX, startY:maxY], startX, startY
+    # 中心点太靠右
+    if maxX - centerX < 20:
+        startX += 20
+        maxX += 20
+
+    return img[startY:maxY, startX:maxX], startX, startY
 
 
 # 输入
@@ -707,20 +708,20 @@ train_file_path = "traindata\\"
 train_file_list = glob(train_file_path+"images_????_????.npy")
 
 init = tf.global_variables_initializer()
+saver = tf.train.Saver()
 sess = tf.Session()
 sess.run(init)
 
-for runs in range(200):
+for runs in range(300):
     train_x = np.array(np.zeros(shape=[isize*3, 299, 299], dtype=np.float32))
     train_y = np.array(np.zeros(shape=[isize*3, 2], dtype=np.float32))
 
     print("Runs " + str(runs) + " start")
-
+    all_loss = 0.0
     for i in range(0, 100):
         istart = i*isize
         iend = istart + isize - 1
         iIndex = 0
-        all_loss = 0.0
         for i_ in range(istart, iend):
             imgfilename = train_file_list[i_]
             v_centerfilename = imgfilename.replace("images", "v_center")
@@ -748,32 +749,36 @@ for runs in range(200):
             iIndex += 1
 
         _, loss_ = sess.run([optimizer, loss], feed_dict={x_: train_x, y_: train_y})
+        all_loss += float(loss_)
 
-        if i % 10 == 0:
-            print("Step ", str(i), "Loss = ", str(loss_))
+        if (i + 1) % 10 == 0:
+            print("Step ", str(i + 1), "Loss = ", str(all_loss/10.0))
+            all_loss = 0
+
+    saver.save(sess, "save/model_%04d.skpt" % runs)
 
 
 # 测试
-test_imgfilename = train_file_list[1063]
-test_v_centerfilename = test_imgfilename.replace("images", "v_center")
-test_img = np.load(test_imgfilename)[1]
-test_v_center = np.load(test_v_centerfilename)
-test_x = np.array(np.zeros(shape=[1, 299, 299], dtype=np.float32))
-test_y = np.array(np.zeros(shape=[1, 2], dtype=np.float32))
-test_x[0] = test_img[106:405, 106:405]
-test_y[0][0] = test_v_center[0] - 106
-test_y[0][1] = test_v_center[1] - 106
+for i in range(20):
+    test_imgfilename = train_file_list[1060+i]
+    test_v_centerfilename = test_imgfilename.replace("images", "v_center")
+    test_img = np.load(test_imgfilename)[1]
+    test_v_center = np.load(test_v_centerfilename)
+    test_x = np.array(np.zeros(shape=[1, 299, 299], dtype=np.float32))
+    test_y = np.array(np.zeros(shape=[1, 2], dtype=np.float32))
 
-y_e, loss_ = sess.run([y_conv, loss], feed_dict={x_: test_x, y_: test_y})
+    test_x[0], startX, startY = cutimg(test_img, test_v_center[0], test_v_center[1])
+    test_y[0][0] = test_v_center[0] - startX
+    test_y[0][1] = test_v_center[1] - startY
 
-print(test_y)
-print(y_e)
-print(loss_)
+    y_e, loss_ = sess.run([y_conv, loss], feed_dict={x_: test_x, y_: test_y})
 
-plt.imshow(test_x[0])
-plt.plot(int(test_y[0][0]), int(test_y[0][1]), 'ro', color='yellow')
-plt.plot(int(y_e[0][0]), int(y_e[0][1]), 'ro', color='red')
-plt.show()
+    print(test_y)
+    print(y_e)
+    print(loss_)
 
-plt.imshow(test_x[0])
-plt.show()
+    plt.imshow(test_x[0])
+    plt.plot(int(test_y[0][0]), int(test_y[0][1]), 'ro', color='yellow')
+    plt.plot(int(y_e[0][0]), int(y_e[0][1]), 'ro', color='red')
+    plt.show()
+
