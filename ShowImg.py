@@ -1,9 +1,11 @@
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 from glob import glob
 
-train_file_path = "traindata\\"
+train_file_path = "/media/xy/247E930D7E92D740/ShareData/traindata/"
 # train_file_list = glob(train_file_path+"images_0004_0086.npy")
 train_file_list = glob(train_file_path+"images_????_????.npy")
 
@@ -44,8 +46,10 @@ def cutimg(img, centerX, centerY):
 
     return img[startY:maxY, startX:maxX], startX, startY
 
+
+print(train_file_list.__len__())
 for i in range(9):
-    test_imgfilename = train_file_list[1060 + i]
+    test_imgfilename = train_file_list[1 + i]
     test_v_centerfilename = test_imgfilename.replace("images", "v_center")
     test_img = np.load(test_imgfilename)[1]
     test_v_center = np.load(test_v_centerfilename)
